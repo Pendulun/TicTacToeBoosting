@@ -1,5 +1,7 @@
 import argparse
-import sys
+import pathlib
+import pandas as pd
+from ADABoost import ADABoost
 
 # https://stackoverflow.com/a/12117089/16264901
 class Range(object):
@@ -66,6 +68,33 @@ def get_arg_parser():
 
     return my_parser
 
+def predict(my_args):
+
+    data_df = pd.read_csv(my_args.data_path)
+
+    DEFAULT_RANDOM_SEED = 42
+    
+    data_df_train = data_df.sample(frac = my_args.train_split, random_state=DEFAULT_RANDOM_SEED, axis=0)
+    data_df_test = data_df[~data_df.index.isin(data_df_train.index)]
+
+    my_ada_boost = ADABoost(num_trees=my_args.n_trees, tree_h = my_args.tree_height)
+    my_ada_boost.fit(data_df_train, target_col='x_win')
+    predictions = my_ada_boost.predict(data_df_test, target_col='x_win')
+
+    #Resultados
+
+def check_data_file(data_file_path):
+    data_file = pathlib.Path(data_file_path)
+    if not data_file.exists():
+        print(f"{data_file} does not exists!")
+        exit(-1)
+
 if __name__ == "__main__":
     my_parser = get_arg_parser()
-    my_parser.parse_args()
+
+    #Already gets from sys.argv
+    my_args = my_parser.parse_args()
+
+    check_data_file(my_args.data_path)
+    
+    predict(my_args)
