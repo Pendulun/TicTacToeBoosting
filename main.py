@@ -82,13 +82,15 @@ def get_pos_mapping_dict():
     mapping_dict['x'] = 1
     mapping_dict['o'] = -1
     mapping_dict['b'] = 0
+    
+    mapping_dict['positive'] = 1
+    mapping_dict['negative'] = 0
 
     return mapping_dict
 
 def treat_data(data_df:pd.DataFrame, ignore_col:str) ->pd.DataFrame:
     pos_mapping_dict = get_pos_mapping_dict()
-    data_df.iloc[:, data_df.columns != ignore_col] = data_df.drop(ignore_col, axis=1).applymap(lambda x: pos_mapping_dict[x])
-    data_df[ignore_col] = data_df[ignore_col].map({'positive': 1, 'negative': 0})
+    data_df = data_df.applymap(lambda x: pos_mapping_dict[x])
 
     return data_df
 
@@ -104,7 +106,7 @@ def predict(my_args):
     data_df_train = data_df.sample(frac = my_args.train_split, random_state=DEFAULT_RANDOM_SEED, axis=0)
     data_df_test = data_df[~data_df.index.isin(data_df_train.index)]
 
-    my_ada_boost = ADABoost(num_trees=my_args.n_trees, tree_h = my_args.tree_height)
+    my_ada_boost = ADABoost(num_trees=my_args.n_trees, tree_h = my_args.tree_height, random_seed = my_args.random_seed)
 
     
     my_ada_boost.fit(data_df_train, target_col=TARGET_COL)

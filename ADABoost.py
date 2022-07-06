@@ -3,9 +3,10 @@ import pandas as pd
 
 class ADABoost():
     
-    def __init__(self, num_trees, tree_h):
+    def __init__(self, num_trees:int, tree_h:int, random_seed:int):
         self._max_n_trees = num_trees
         self._max_tree_height = tree_h
+        self._random_seed = random_seed
         self._tree = None
     
     @property
@@ -43,7 +44,7 @@ class ADABoost():
         self._max_tree_height = new_max
     
     def fit(self, dataframe:pd.DataFrame, target_col:str):
-        my_tree = tree.DecisionTreeClassifier(max_depth=self._max_tree_height)
+        my_tree = tree.DecisionTreeClassifier(max_depth=self._max_tree_height, random_state=self._random_seed)
         
         x = dataframe.drop(target_col, axis=1)
         y = dataframe[target_col]
