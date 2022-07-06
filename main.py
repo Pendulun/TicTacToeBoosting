@@ -77,9 +77,27 @@ def get_arg_parser():
 
     return my_parser
 
+def get_pos_mapping_dict():
+    mapping_dict = dict()
+    mapping_dict['x'] = 1
+    mapping_dict['o'] = -1
+    mapping_dict['b'] = 0
+
+    return mapping_dict
+
+def treat_data(data_df:pd.DataFrame, ignore_col:str) ->pd.DataFrame:
+    pos_mapping_dict = get_pos_mapping_dict()
+    data_df.iloc[:, data_df.columns != ignore_col] = data_df.drop(ignore_col, axis=1).applymap(lambda x: pos_mapping_dict[x])
+    data_df[ignore_col] = data_df[ignore_col].map({'positive': 1, 'negative': 0})
+
+    return data_df
+
 def predict(my_args):
 
     data_df = pd.read_csv(my_args.data_path)
+    TARGET_COL = 'x-win'
+
+    data_df = treat_data(data_df, TARGET_COL)
 
     DEFAULT_RANDOM_SEED = 42
     
@@ -87,10 +105,12 @@ def predict(my_args):
     data_df_test = data_df[~data_df.index.isin(data_df_train.index)]
 
     my_ada_boost = ADABoost(num_trees=my_args.n_trees, tree_h = my_args.tree_height)
-    my_ada_boost.fit(data_df_train, target_col='x_win')
-    predictions = my_ada_boost.predict(data_df_test, target_col='x_win')
 
-    #Resultados
+    
+    my_ada_boost.fit(data_df_train, target_col=TARGET_COL)
+    predictions = my_ada_boost.predict(data_df_test, target_col=TARGET_COL)
+
+    print(predictions)
 
 def check_data_file(data_file_path):
     data_file = pathlib.Path(data_file_path)

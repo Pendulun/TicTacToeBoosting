@@ -1,8 +1,12 @@
+from sklearn import tree
+import pandas as pd
+
 class ADABoost():
     
     def __init__(self, num_trees, tree_h):
         self._max_n_trees = num_trees
         self._max_tree_height = tree_h
+        self._tree = None
     
     @property
     def max_n_trees(self):
@@ -38,10 +42,15 @@ class ADABoost():
         
         self._max_tree_height = new_max
     
-    def fit(self, dataframe, target_col):
-        pass
+    def fit(self, dataframe:pd.DataFrame, target_col:str):
+        my_tree = tree.DecisionTreeClassifier(max_depth=self._max_tree_height)
+        
+        x = dataframe.drop(target_col, axis=1)
+        y = dataframe[target_col]
+        my_tree.fit(x, y)
 
-    def predict(self, dataframe, target_col) -> list:
-        predictions = [0] * len(dataframe)
+        self._tree = my_tree
 
-        return predictions
+    def predict(self, dataframe:pd.DataFrame, target_col:str) -> list:
+        x = dataframe.drop(target_col, axis=1)
+        return self._tree.predict(x)
