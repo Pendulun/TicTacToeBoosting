@@ -65,6 +65,15 @@ def get_arg_parser():
                             type=int, default=DEFAULT_TREE_HEIGHT, choices=[MinRange(MIN_TREE_HEIGHT)],
                             help=tree_height_help_msg
                         )
+    
+    DEFAULT_RANDOM_SEED = 42
+    MIN_RAND_SEED = 1
+    rand_seed_help_msg = "The random seed to be used along the program."
+    rand_seed_help_msg += f" Default: {DEFAULT_RANDOM_SEED}"
+    my_parser.add_argument("--random_seed", metavar="seed",
+                            type=int, default = DEFAULT_RANDOM_SEED, choices=[MinRange(MIN_RAND_SEED)],
+                            help=rand_seed_help_msg
+    )  
 
     return my_parser
 
