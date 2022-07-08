@@ -1,4 +1,5 @@
 from math import exp, log
+import math
 from sklearn import tree
 from sklearn.metrics import accuracy_score
 import pandas as pd
@@ -22,7 +23,7 @@ class ADABoost():
     
     @max_n_trees.setter
     def max_n_trees(self, new_max):
-        if type(new_max) != int:
+        if not isinstance(new_max, int):
             raise TypeError("max_n_trees must be an int!")
         
         if new_max < 1:
@@ -39,7 +40,7 @@ class ADABoost():
     
     @max_tree_height.setter
     def max_tree_height(self, new_max):
-        if type(new_max) != int:
+        if not isinstance(new_max, int):
             raise TypeError("max_tree_height must be an int!")
         
         if new_max < 1:
@@ -47,25 +48,38 @@ class ADABoost():
         
         self._max_tree_height = new_max
     
+    @property
+    def alphas(self):
+        """
+        The trees weights to the final result
+        """
+        return self._trees_alphas
+    
+    @alphas.setter
+    def alphas(self, new_alphas):
+        raise AttributeError("Aplhas is not writable")
+    
     def fit(self, dataframe:pd.DataFrame, target_col:str):
         sample_weights = self._get_starting_weights(len(dataframe))
 
-        x = dataframe.drop(target_col, axis=1)
-        y = dataframe[target_col]
+        x_data = dataframe.drop(target_col, axis=1)
+        y_labels = dataframe[target_col]
 
         tree_count = 0
         curr_it = 1
         while tree_count < self._max_n_trees:
 
             curr_tree = self._get_new_tree()
-            curr_tree.fit(x, y, sample_weight=sample_weights)
+            curr_tree.fit(x_data, y_labels, sample_weight=sample_weights)
 
-            curr_tree_pred = curr_tree.predict(x)
+            curr_tree_pred = curr_tree.predict(x_data)
             
-            curr_tree_error = self._get_tree_error(sample_weights, y.values, curr_tree_pred)
-            curr_tree_alpha = self._get_tree_alpha( curr_it, curr_tree_error)
+            curr_tree_error = self._get_tree_error(sample_weights, y_labels.values, curr_tree_pred)
+            curr_tree_alpha = self._get_tree_alpha(curr_it, curr_tree_error)
 
-            sample_weights = self._update_weights(sample_weights, y.values, curr_tree_pred, curr_tree_alpha)
+            sample_weights = self._update_weights(
+                                            sample_weights, y_labels.values, 
+                                            curr_tree_pred, curr_tree_alpha)
             
             self._trees.append(curr_tree)
             self._trees_alphas.append(curr_tree_alpha)
@@ -76,7 +90,7 @@ class ADABoost():
             tree_count += 1
             curr_it += 1
     
-    def _get_starting_weights(self, data_len:int) ->np.ndarray:
+    def _get_starting_weights(self, data_len:int) -> np.ndarray:
         return np.full((data_len), 1/data_len)
 
     def _get_new_tree(self):
@@ -84,23 +98,17 @@ class ADABoost():
 
     def _get_tree_error(self, sample_weights, true_y:np.ndarray, pred_y:np.ndarray) -> float:
         curr_tree_accuracy = accuracy_score(true_y, pred_y, normalize=True, sample_weight=sample_weights)
-        print(f"Curr Tree acc: {curr_tree_accuracy}")
         curr_tree_error = 1-curr_tree_accuracy
         return curr_tree_error
 
     def _get_tree_alpha(self, curr_it:int, error:float) -> float:
-        #default value if error is 0
-        it_weighted_error = 1/curr_it
-        if error != 0:
-            it_weighted_error = (error)**curr_it
+        curr_tree_alpha = 1
+
+        #Assumes that error will never be 1
+        if not math.isclose(error, 0):
+            curr_tree_alpha = 0.5*(log((1-(error))/error))
         else:
             print(f"error == 0 at it {curr_it}")
-        
-        curr_tree_alpha = 0.5
-        if it_weighted_error != 1:
-            curr_tree_alpha = 0.5*(log((1-(it_weighted_error))/it_weighted_error))
-        else:
-            print("it_weighted_error == 1")
 
         return curr_tree_alpha
     
@@ -118,35 +126,34 @@ class ADABoost():
             yield exp(-1*alpha*pred_y[label_idx]*true_y[label_idx])
 
     def predict(self, dataframe:pd.DataFrame, target_col:str) -> list:
-        x = dataframe.drop(target_col, axis=1)
-        return self._predict_from_trees(x)
+        x_features = dataframe.drop(target_col, axis=1)
+        return self._predict_from_trees(x_features)
     
-    def _predict_from_trees(self, x:pd.DataFrame) -> int:
+    def _predict_from_trees(self, x_data:pd.DataFrame) -> int:
         
-        results = [tree.predict(x) for tree in self._trees]
+        predictions = [tree.predict(x_data) for tree in self._trees]
 
         final_results = list()
-        num_inputs = len(results[0])
-        for curr_input_prediction_idx in range(num_inputs):
-            predictions_for_curr_input = [preds[curr_input_prediction_idx] for preds in results]
-            final_results.append(self._weighted_most_frequent(predictions_for_curr_input))
+        for curr_input_idx in range(len(x_data)):
+            predictions_for_curr_input = [tree_pred[curr_input_idx] for tree_pred in predictions]
+            final_class = self._weighted_most_frequent(predictions_for_curr_input)
+            final_results.append(final_class)
 
         return final_results
     
-    def _weighted_most_frequent(self, numbers:list) -> float:
+    def _weighted_most_frequent(self, pred_list:list) -> float:
 
         weight_per_result = dict()
 
         biggest_weight = -1
         biggest_weight_result = None
-        for result_idx in range(len(numbers)):
-            curr_result = numbers[result_idx]
-            weight_per_result[curr_result] = weight_per_result.get(curr_result, 0) + self._trees_alphas[result_idx]
-            
-            curr_result_weight = weight_per_result[curr_result]
+        for curr_tree_pred, curr_tree_alpha in zip(pred_list, self._trees_alphas):
+            weight_per_result[curr_tree_pred] = weight_per_result.get(curr_tree_pred, 0) + curr_tree_alpha
+
+            curr_result_weight = weight_per_result[curr_tree_pred]
             if curr_result_weight > biggest_weight:
                 biggest_weight = curr_result_weight
-                biggest_weight_result = curr_result
+                biggest_weight_result = curr_tree_pred
 
         return biggest_weight_result
     
