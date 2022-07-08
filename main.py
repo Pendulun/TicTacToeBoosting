@@ -84,11 +84,11 @@ def get_pos_mapping_dict():
     mapping_dict['b'] = 0
     
     mapping_dict['positive'] = 1
-    mapping_dict['negative'] = 0
+    mapping_dict['negative'] = -1
 
     return mapping_dict
 
-def treat_data(data_df:pd.DataFrame, ignore_col:str) ->pd.DataFrame:
+def treat_data(data_df:pd.DataFrame) ->pd.DataFrame:
     pos_mapping_dict = get_pos_mapping_dict()
     data_df = data_df.applymap(lambda x: pos_mapping_dict[x])
 
@@ -99,7 +99,7 @@ def predict(my_args):
     data_df = pd.read_csv(my_args.data_path)
     TARGET_COL = 'x-win'
 
-    data_df = treat_data(data_df, TARGET_COL)
+    data_df = treat_data(data_df)
 
     DEFAULT_RANDOM_SEED = 42
     
@@ -112,7 +112,8 @@ def predict(my_args):
     my_ada_boost.fit(data_df_train, target_col=TARGET_COL)
     predictions = my_ada_boost.predict(data_df_test, target_col=TARGET_COL)
 
-    print(predictions)
+    print(f"Final Predictions:\n{predictions}")
+    print(f"Accuracy: {my_ada_boost.get_accuracy(data_df_test[TARGET_COL].values, predictions)}")
 
 def check_data_file(data_file_path):
     data_file = pathlib.Path(data_file_path)
