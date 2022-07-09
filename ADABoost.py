@@ -6,9 +6,9 @@ import numpy as np
 
 class ADABoost():
     
-    def __init__(self, num_trees:int, tree_h:int, random_seed:int):
+    def __init__(self, num_trees:int, random_seed:int):
         self._max_n_trees = num_trees
-        self._max_tree_height = tree_h
+        self._max_tree_height = 1
         self._random_seed = random_seed
         self._trees = list()
         self._trees_alphas = list()

@@ -58,16 +58,6 @@ def get_arg_parser():
                             help=n_trees_help_msg
                         )
     
-    DEFAULT_TREE_HEIGHT = 1
-    MIN_TREE_HEIGHT = 1
-    tree_height_help_msg = "The max tree height to use."
-    tree_height_help_msg += f" Minimum: {MIN_TREE_HEIGHT}."
-    tree_height_help_msg += f" Default = {DEFAULT_TREE_HEIGHT}"
-    args_parser.add_argument("--tree_height", metavar="height",
-                            type=int, default=DEFAULT_TREE_HEIGHT, choices=[MinRange(MIN_TREE_HEIGHT)],
-                            help=tree_height_help_msg
-                        )
-    
     DEFAULT_RANDOM_SEED = 42
     MIN_RAND_SEED = 1
     rand_seed_help_msg = "The random seed to be used along the program."
@@ -96,21 +86,21 @@ def treat_data(data_df:pd.DataFrame) ->pd.DataFrame:
 
     return data_df
 
-def train_test_split(parsed_args, data_df:pd.DataFrame) -> tuple:
-    data_df_train = data_df.sample(frac = parsed_args.train_split, random_state=parsed_args.random_seed,
+def train_test_split(train_split, random_seed, data_df:pd.DataFrame) -> tuple:
+    data_df_train = data_df.sample(frac = train_split, random_state=random_seed,
                                     axis=0)
     
     data_df_test = data_df[~data_df.index.isin(data_df_train.index)]
     return data_df_train,data_df_test
 
-def get_kfold_scores(parsed_args, y_train, x_train, n_folds=5) -> list:
+def get_kfold_scores(n_trees, rand_seed, y_train, x_train, n_folds=5) -> list:
     """
     https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.KFold.html
     """
     scores = []
     kf = KFold(n_splits=n_folds)
     for train_index, test_index in kf.split(x_train):
-        curr_model = ADABoost(parsed_args.n_trees, parsed_args.tree_height, parsed_args.random_seed)
+        curr_model = ADABoost(n_trees, rand_seed)
         X_train_kf, X_test_kf = x_train[train_index], x_train[test_index]
         y_train_kf, y_test_kf = y_train[train_index], y_train[test_index]
 
@@ -124,7 +114,7 @@ def get_train_test_data(parsed_args):
     data_df = pd.read_csv(parsed_args.data_path)
     data_df = treat_data(data_df)
     
-    data_df_train, data_df_test = train_test_split(parsed_args, data_df)
+    data_df_train, data_df_test = train_test_split(parsed_args.train_split, parsed_args.random_seed, data_df)
 
     TARGET_COL = 'x-win'
     y_train = data_df_train[TARGET_COL]
@@ -138,14 +128,23 @@ def predict(parsed_args):
 
     y_train, x_train, y_test, x_test = get_train_test_data(parsed_args)
 
-    scores = get_kfold_scores(parsed_args, y_train.values, x_train.values)
-    print(f"Kfold scores : {scores}, mean: {sum(scores)/len(scores)}")
+    kfold_scores = []
+    real_scores = []
+    for n_trees in range(9, 102, 2):
 
-    final_model = ADABoost(parsed_args.n_trees, parsed_args.tree_height, parsed_args.random_seed)
-    final_model.fit(x_train.values, y_train.values)
-    final_predictions = final_model.predict(x_test.values)
-    # print(f"Final Predictions:\n{predictions}")
-    print(f"Accuracy: {final_model.get_accuracy(y_test, final_predictions)}")
+        scores = get_kfold_scores(n_trees, parsed_args.random_seed, y_train.values, x_train.values)
+        kfold_mean_score = sum(scores)/len(scores)
+        kfold_scores.append(kfold_mean_score)
+
+        final_model = ADABoost(n_trees, parsed_args.random_seed)
+        final_model.fit(x_train.values, y_train.values)
+        final_predictions = final_model.predict(x_test.values)
+        # print(f"Final Predictions:\n{predictions}")
+        final_acc = final_model.get_accuracy(y_test, final_predictions)
+        real_scores.append(final_acc)
+    
+    print(f"kfold scores:\n{kfold_scores}")
+    print(f"Real scores:\n{real_scores}")
 
 def check_data_file(data_file_path):
     data_file = pathlib.Path(data_file_path)
