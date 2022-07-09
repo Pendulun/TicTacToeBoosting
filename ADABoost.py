@@ -1,10 +1,12 @@
-from math import exp, log
-import math
+from math import exp, log, isclose
 from sklearn import tree
 from sklearn.metrics import accuracy_score
 import numpy as np
 
 class ADABoost():
+    """
+    ADABoost implementation using DecisionTrees
+    """
     
     def __init__(self, num_trees:int, random_seed:int):
         self._max_n_trees = num_trees
@@ -12,6 +14,7 @@ class ADABoost():
         self._random_seed = random_seed
         self._trees = list()
         self._trees_alphas = list()
+        self._trees_errors = list()
     
     @property
     def max_n_trees(self):
@@ -56,15 +59,29 @@ class ADABoost():
     
     @alphas.setter
     def alphas(self, new_alphas):
-        raise AttributeError("Aplhas is not writable")
+        raise AttributeError("Alphas is not writable")
+    
+    @property
+    def trees_errors(self):
+        """
+        The error for each fitted tree
+        """
+        return self._trees_errors
+    
+    @trees_errors.setter
+    def trees_errors(self, new_errors):
+        raise AttributeError("trees_errors is not writable")
     
     def fit(self, x_data:np.ndarray, y_labels:np.ndarray):
+        """
+        Fit an ensemble of DecisionTrees to the x_data with true y_labels
+        """
 
         if not isinstance(x_data, np.ndarray):
             raise TypeError("x_data should be np.ndarray")
         
         if not isinstance(y_labels, np.ndarray):
-            raise TypeError("y_label should be np.ndarray")
+            raise TypeError("y_labels should be np.ndarray")
 
         sample_weights = self._get_starting_weights(x_data.shape[0])
 
@@ -78,6 +95,7 @@ class ADABoost():
             curr_tree_pred = curr_tree.predict(x_data)
             
             curr_tree_error = self._get_tree_error(sample_weights, y_labels, curr_tree_pred)
+            self._trees_errors.append(curr_tree_error)
             curr_tree_alpha = self._get_tree_alpha(curr_it, curr_tree_error)
 
             sample_weights = self._update_weights(sample_weights, y_labels, curr_tree_pred, curr_tree_alpha)
@@ -106,7 +124,7 @@ class ADABoost():
         curr_tree_alpha = 1
 
         #Assumes that error will never be 1 (100%)
-        if not math.isclose(error, 0):
+        if not isclose(error, 0):
             curr_tree_alpha = 0.5*(log((1-(error))/error))
         else:
             print(f"error == 0 at it {curr_it}")
@@ -126,11 +144,14 @@ class ADABoost():
         for label_idx in range(true_y.shape[0]):
             yield exp(-1*alpha*pred_y[label_idx]*true_y[label_idx])
 
-    def predict(self, x_features:np.ndarray) -> list:
-        if not isinstance(x_features, np.ndarray):
-            raise TypeError("x_features should be np.ndarray")
+    def predict(self, data:np.ndarray) -> list:
+        """
+        Return a list of predictions for the data
+        """
+        if not isinstance(data, np.ndarray):
+            raise TypeError("data should be np.ndarray")
 
-        return self._predict_from_trees(x_features)
+        return self._predict_from_trees(data)
     
     def _predict_from_trees(self, x_data:np.ndarray) -> int:
         
