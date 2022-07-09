@@ -93,7 +93,7 @@ def train_test_split(train_split, random_seed, data_df:pd.DataFrame) -> tuple:
     data_df_test = data_df[~data_df.index.isin(data_df_train.index)]
     return data_df_train,data_df_test
 
-def get_kfold_scores(n_trees, rand_seed, y_train, x_train, n_folds=5) -> list:
+def get_kfold_mean_score(n_trees, rand_seed, y_train, x_train, n_folds=5) -> float:
     """
     https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.KFold.html
     """
@@ -108,13 +108,13 @@ def get_kfold_scores(n_trees, rand_seed, y_train, x_train, n_folds=5) -> list:
         predictions = curr_model.predict(X_test_kf)
         scores.append(curr_model.get_accuracy(y_test_kf, predictions))
     
-    return scores
+    return sum(scores)/len(scores)
 
-def get_train_test_data(parsed_args):
-    data_df = pd.read_csv(parsed_args.data_path)
+def get_train_test_data(data_path:str, train_split:float, rand_seed:int):
+    data_df = pd.read_csv(data_path)
     data_df = treat_data(data_df)
     
-    data_df_train, data_df_test = train_test_split(parsed_args.train_split, parsed_args.random_seed, data_df)
+    data_df_train, data_df_test = train_test_split(train_split, rand_seed, data_df)
 
     TARGET_COL = 'x-win'
     y_train = data_df_train[TARGET_COL]
@@ -126,25 +126,17 @@ def get_train_test_data(parsed_args):
 
 def predict(parsed_args):
 
-    y_train, x_train, y_test, x_test = get_train_test_data(parsed_args)
+    y_train, x_train, y_test, x_test = get_train_test_data(parsed_args.data_path, parsed_args.train_split, parsed_args.random_seed)
 
-    kfold_scores = []
-    real_scores = []
-    for n_trees in range(9, 102, 2):
+    kfold_mean_score = get_kfold_mean_score(parsed_args.n_trees, parsed_args.random_seed, y_train.values, x_train.values)
+    print(f"k fold mean accuracy score: {kfold_mean_score}")
 
-        scores = get_kfold_scores(n_trees, parsed_args.random_seed, y_train.values, x_train.values)
-        kfold_mean_score = sum(scores)/len(scores)
-        kfold_scores.append(kfold_mean_score)
+    final_model = ADABoost(parsed_args.n_trees, parsed_args.random_seed)
+    final_model.fit(x_train.values, y_train.values)
+    final_predictions = final_model.predict(x_test.values)
 
-        final_model = ADABoost(n_trees, parsed_args.random_seed)
-        final_model.fit(x_train.values, y_train.values)
-        final_predictions = final_model.predict(x_test.values)
-        # print(f"Final Predictions:\n{predictions}")
-        final_acc = final_model.get_accuracy(y_test, final_predictions)
-        real_scores.append(final_acc)
-    
-    print(f"kfold scores:\n{kfold_scores}")
-    print(f"Real scores:\n{real_scores}")
+    test_acc = final_model.get_accuracy(y_test, final_predictions)
+    print(f"Test accuracy: {test_acc}")
 
 def check_data_file(data_file_path):
     data_file = pathlib.Path(data_file_path)
