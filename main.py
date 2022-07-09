@@ -2,6 +2,7 @@ import argparse
 import pathlib
 import sys
 import pandas as pd
+from sklearn.model_selection import KFold
 from ADABoost import ADABoost
 
 # https://stackoverflow.com/a/12117089/16264901
@@ -102,21 +103,49 @@ def train_test_split(parsed_args, data_df:pd.DataFrame) -> tuple:
     data_df_test = data_df[~data_df.index.isin(data_df_train.index)]
     return data_df_train,data_df_test
 
-def predict(parsed_args):
+def get_kfold_scores(parsed_args, y_train, x_train, n_folds=5) -> list:
+    """
+    https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.KFold.html
+    """
+    scores = []
+    kf = KFold(n_splits=n_folds)
+    for train_index, test_index in kf.split(x_train):
+        curr_model = ADABoost(parsed_args.n_trees, parsed_args.tree_height, parsed_args.random_seed)
+        X_train_kf, X_test_kf = x_train[train_index], x_train[test_index]
+        y_train_kf, y_test_kf = y_train[train_index], y_train[test_index]
 
+        curr_model.fit(X_train_kf, y_train_kf)
+        predictions = curr_model.predict(X_test_kf)
+        scores.append(curr_model.get_accuracy(y_test_kf, predictions))
+    
+    return scores
+
+def get_train_test_data(parsed_args):
     data_df = pd.read_csv(parsed_args.data_path)
     data_df = treat_data(data_df)
     
     data_df_train, data_df_test = train_test_split(parsed_args, data_df)
 
-    my_ada_boost = ADABoost(parsed_args.n_trees, parsed_args.tree_height, parsed_args.random_seed)
-
     TARGET_COL = 'x-win'
-    my_ada_boost.fit(data_df_train, TARGET_COL)
-    predictions = my_ada_boost.predict(data_df_test, TARGET_COL)
+    y_train = data_df_train[TARGET_COL]
+    x_train = data_df_train.drop(TARGET_COL, axis=1)
 
+    y_test = data_df_test[TARGET_COL]
+    x_test = data_df_test.drop(TARGET_COL, axis=1)
+    return y_train,x_train,y_test,x_test
+
+def predict(parsed_args):
+
+    y_train, x_train, y_test, x_test = get_train_test_data(parsed_args)
+
+    scores = get_kfold_scores(parsed_args, y_train.values, x_train.values)
+    print(f"Kfold scores : {scores}, mean: {sum(scores)/len(scores)}")
+
+    final_model = ADABoost(parsed_args.n_trees, parsed_args.tree_height, parsed_args.random_seed)
+    final_model.fit(x_train.values, y_train.values)
+    final_predictions = final_model.predict(x_test.values)
     # print(f"Final Predictions:\n{predictions}")
-    print(f"Accuracy: {my_ada_boost.get_accuracy(data_df_test[TARGET_COL].values, predictions)}")
+    print(f"Accuracy: {final_model.get_accuracy(y_test, final_predictions)}")
 
 def check_data_file(data_file_path):
     data_file = pathlib.Path(data_file_path)

@@ -2,7 +2,6 @@ from math import exp, log
 import math
 from sklearn import tree
 from sklearn.metrics import accuracy_score
-import pandas as pd
 import numpy as np
 
 class ADABoost():
@@ -59,11 +58,15 @@ class ADABoost():
     def alphas(self, new_alphas):
         raise AttributeError("Aplhas is not writable")
     
-    def fit(self, dataframe:pd.DataFrame, target_col:str):
-        sample_weights = self._get_starting_weights(len(dataframe))
+    def fit(self, x_data:np.ndarray, y_labels:np.ndarray):
 
-        x_data = dataframe.drop(target_col, axis=1)
-        y_labels = dataframe[target_col]
+        if not isinstance(x_data, np.ndarray):
+            raise TypeError("x_data should be np.ndarray")
+        
+        if not isinstance(y_labels, np.ndarray):
+            raise TypeError("y_label should be np.ndarray")
+
+        sample_weights = self._get_starting_weights(x_data.shape[0])
 
         tree_count = 0
         curr_it = 1
@@ -74,12 +77,10 @@ class ADABoost():
 
             curr_tree_pred = curr_tree.predict(x_data)
             
-            curr_tree_error = self._get_tree_error(sample_weights, y_labels.values, curr_tree_pred)
+            curr_tree_error = self._get_tree_error(sample_weights, y_labels, curr_tree_pred)
             curr_tree_alpha = self._get_tree_alpha(curr_it, curr_tree_error)
 
-            sample_weights = self._update_weights(
-                                            sample_weights, y_labels.values, 
-                                            curr_tree_pred, curr_tree_alpha)
+            sample_weights = self._update_weights(sample_weights, y_labels, curr_tree_pred, curr_tree_alpha)
             
             self._trees.append(curr_tree)
             self._trees_alphas.append(curr_tree_alpha)
@@ -104,7 +105,7 @@ class ADABoost():
     def _get_tree_alpha(self, curr_it:int, error:float) -> float:
         curr_tree_alpha = 1
 
-        #Assumes that error will never be 1
+        #Assumes that error will never be 1 (100%)
         if not math.isclose(error, 0):
             curr_tree_alpha = 0.5*(log((1-(error))/error))
         else:
@@ -112,8 +113,8 @@ class ADABoost():
 
         return curr_tree_alpha
     
-    def _update_weights(self, sample_weights:np.ndarray, true_y:pd.DataFrame, pred_y:np.ndarray, alpha:float) ->np.ndarray:
-        input_size = len(true_y)
+    def _update_weights(self, sample_weights:np.ndarray, true_y:np.ndarray, pred_y:np.ndarray, alpha:float) ->np.ndarray:
+        input_size = true_y.shape[0]
         
         euler_vector = np.fromiter(self._euler_exponents(alpha, pred_y, true_y), dtype=float, count = input_size)
 
@@ -125,16 +126,18 @@ class ADABoost():
         for label_idx in range(true_y.shape[0]):
             yield exp(-1*alpha*pred_y[label_idx]*true_y[label_idx])
 
-    def predict(self, dataframe:pd.DataFrame, target_col:str) -> list:
-        x_features = dataframe.drop(target_col, axis=1)
+    def predict(self, x_features:np.ndarray) -> list:
+        if not isinstance(x_features, np.ndarray):
+            raise TypeError("x_features should be np.ndarray")
+
         return self._predict_from_trees(x_features)
     
-    def _predict_from_trees(self, x_data:pd.DataFrame) -> int:
+    def _predict_from_trees(self, x_data:np.ndarray) -> int:
         
         predictions = [tree.predict(x_data) for tree in self._trees]
 
         final_results = list()
-        for curr_input_idx in range(len(x_data)):
+        for curr_input_idx in range(x_data.shape[0]):
             predictions_for_curr_input = [tree_pred[curr_input_idx] for tree_pred in predictions]
             final_class = self._weighted_most_frequent(predictions_for_curr_input)
             final_results.append(final_class)
