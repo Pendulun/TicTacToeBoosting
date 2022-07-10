@@ -110,12 +110,21 @@ class ADABoost():
             curr_it += 1
     
     def _get_starting_weights(self, data_len:int) -> np.ndarray:
+        """
+        Returns an array with the starting weights for every input data point
+        """
         return np.full((data_len), 1/data_len)
 
     def _get_new_tree(self):
+        """
+        Returns a new tree model with 1 node.
+        """
         return tree.DecisionTreeClassifier(max_depth=self._max_tree_height, random_state=self._random_seed)
 
     def _get_tree_error(self, sample_weights, true_y:np.ndarray, pred_y:np.ndarray) -> float:
+        """
+        Returns the curr tree error considering the input weights
+        """
         curr_tree_accuracy = accuracy_score(true_y, pred_y, normalize=True, sample_weight=sample_weights)
         curr_tree_error = 1-curr_tree_accuracy
         return curr_tree_error
@@ -132,6 +141,9 @@ class ADABoost():
         return curr_tree_alpha
     
     def _update_weights(self, sample_weights:np.ndarray, true_y:np.ndarray, pred_y:np.ndarray, alpha:float) ->np.ndarray:
+        """
+        Update the input's point's weights
+        """
         input_size = true_y.shape[0]
         
         euler_vector = np.fromiter(self._euler_exponents(alpha, pred_y, true_y), dtype=float, count = input_size)
@@ -141,6 +153,9 @@ class ADABoost():
         return sample_weights
     
     def _euler_exponents(self, alpha:float, pred_y:np.ndarray, true_y:np.ndarray):
+        """
+        Returns the values in which every input weight should be multiplied
+        """
         for label_idx in range(true_y.shape[0]):
             yield exp(-1*alpha*pred_y[label_idx]*true_y[label_idx])
 
@@ -154,6 +169,9 @@ class ADABoost():
         return self._predict_from_trees(data)
     
     def _predict_from_trees(self, x_data:np.ndarray) -> int:
+        """
+        Returns the list of predictions for every input considering the trained trees
+        """
         
         predictions = [tree.predict(x_data) for tree in self._trees]
 
@@ -166,6 +184,9 @@ class ADABoost():
         return final_results
     
     def _weighted_most_frequent(self, pred_list:list) -> float:
+        """
+        Returns the value associated with the biggest alpha sum of trees that predicted a value
+        """
 
         weight_per_result = dict()
 

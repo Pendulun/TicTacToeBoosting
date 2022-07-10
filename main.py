@@ -81,12 +81,18 @@ def get_pos_mapping_dict():
     return mapping_dict
 
 def treat_data(data_df:pd.DataFrame) ->pd.DataFrame:
+    """
+    Maps the input data to integer form
+    """
     pos_mapping_dict = get_pos_mapping_dict()
     data_df = data_df.applymap(lambda x: pos_mapping_dict[x])
 
     return data_df
 
-def train_test_split(train_split, random_seed, data_df:pd.DataFrame) -> tuple:
+def train_test_split(train_split:float, random_seed, data_df:pd.DataFrame) -> tuple:
+    """
+    Get train_split samples from the dataframe with random_seed as seed
+    """
     data_df_train = data_df.sample(frac = train_split, random_state=random_seed,
                                     axis=0)
     
@@ -96,6 +102,7 @@ def train_test_split(train_split, random_seed, data_df:pd.DataFrame) -> tuple:
 def get_kfold_mean_score(n_trees, rand_seed, y_train, x_train, n_folds=5) -> float:
     """
     https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.KFold.html
+    Do cross-validation with 5 folds and return the mean accuracy for the model 
     """
     scores = []
     kf = KFold(n_splits=n_folds)
@@ -110,7 +117,10 @@ def get_kfold_mean_score(n_trees, rand_seed, y_train, x_train, n_folds=5) -> flo
     
     return sum(scores)/len(scores)
 
-def get_train_test_data(data_path:str, train_split:float, rand_seed:int):
+def get_train_test_data(data_path:str, train_split:float, rand_seed:int) -> tuple:
+    """
+    Splits the data on the data_path provided in train and test with train_split proportion
+    """
     data_df = pd.read_csv(data_path)
     data_df = treat_data(data_df)
     
@@ -138,11 +148,9 @@ def predict(parsed_args):
     test_acc = final_model.get_accuracy(y_test, final_predictions)
     print(f"Test accuracy: {test_acc}")
 
-def check_data_file(data_file_path):
+def file_exists(data_file_path):
     data_file = pathlib.Path(data_file_path)
-    if not data_file.exists():
-        print(f"{data_file} does not exists!")
-        sys.exit(-1)
+    return data_file.exists()
 
 if __name__ == "__main__":
     my_parser = get_arg_parser()
@@ -150,6 +158,8 @@ if __name__ == "__main__":
     #Already gets from sys.argv
     my_args = my_parser.parse_args()
 
-    check_data_file(my_args.data_path)
+    if not file_exists(my_args.data_path):
+        print(f"{my_args.data_path} does not exists!")
+        sys.exit(-1)
     
     predict(my_args)
